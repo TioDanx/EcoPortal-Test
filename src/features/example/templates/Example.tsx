@@ -13,7 +13,6 @@ import { memo } from 'react';
 import { useCurrentUserLazyQuery } from '../../../generated/graphql';
 import { FetchButton } from '../components/FetchButton';
 
-const primary = '#1976d2';
 
 const Example = () => {
   const dispatch = useAppDispatch();
@@ -24,7 +23,7 @@ const Example = () => {
   });
   return (
     <div css={styles.root}>
-      <Paper elevation={3} css={styles.navBar}>
+      <Paper elevation={3} css={styles.navBar} color="primary">
         <Typography>{'EcoPortal'}</Typography>
       </Paper>
 
@@ -103,7 +102,6 @@ const styles = {
     alignItems: 'center',
   }),
   navBar: css({
-    background: primary,
     height: 50,
     alignSelf: 'stretch',
     display: 'flex',
@@ -132,7 +130,7 @@ const styles = {
     textAlign: 'center',
     maxWidth: 600,
     margin: '24px 0',
-    color: 'rgba(0, 0, 0, 0.6)',
+    color: 'rgba(255, 255, 255, 0.84)',
   }),
   mainControls: css({
     display: 'flex',
