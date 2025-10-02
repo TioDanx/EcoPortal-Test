@@ -6,7 +6,7 @@ export const appTheme = createTheme({
     mode: 'dark',
     primary: { main: '#6C5CE7' },        
     secondary: { main: '#9A7DFF' },      
-    background: { default: '#0B0B0F', paper: '#121219' },
+    background: { default: '#0B0B0F', paper: '#540661' },
     text: { primary: '#EDEDF7', secondary: '#B7B7C9' },
   },
   shape: { borderRadius: 12 },
