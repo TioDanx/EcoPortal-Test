@@ -50,3 +50,14 @@ export interface GqlUser {
     containerId: string;
   };
   
+  export type ReviewsState = {
+    movies: GqlMovie[];
+    activeIndex: number;
+  };
+  
+  export type AddReviewPayload = {
+    movieId: string;
+    review: Omit<GqlReview, 'id' | 'movieId'> & { id: string };
+  };
+
+  
