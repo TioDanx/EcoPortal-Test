@@ -8,6 +8,7 @@ import { EnhancedStore } from "@reduxjs/toolkit";
 import { ApolloClient, ApolloProvider, InMemoryCache } from "@apollo/client";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { appTheme } from "../theme";
+import { plusJakarta } from "../fonts";
 
 const App: FC<AppProps> = ({ Component, pageProps }) => {
   const [store, setStore] = useState<EnhancedStore | null>(null);
@@ -24,7 +25,7 @@ const App: FC<AppProps> = ({ Component, pageProps }) => {
   }, []);
   if (!store || !client) return <>{"Loading..."}</>;
   return (
-    <>
+    <main className={plusJakarta.className}>
       <Head>
         <title>{"Coolmovies Frontend"}</title>
         <meta charSet="UTF-8" />
@@ -39,7 +40,7 @@ const App: FC<AppProps> = ({ Component, pageProps }) => {
           </ThemeProvider>
         </ApolloProvider>
       </ReduxProvider>
-    </>
+    </main>
   );
 };
 
