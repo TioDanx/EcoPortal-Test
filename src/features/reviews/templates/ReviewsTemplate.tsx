@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { css } from "@emotion/react";
 import {
   Paper,
@@ -13,34 +13,25 @@ import { appTheme } from "../../../theme";
 import AddReviewDialog from "../components/AddReviewDialog";
 import ReviewFeed from "../components/ReviewFeed";
 import { useAppDispatch, useAppSelector } from "../../../state";
-import {
-  selectActiveIndex,
-  selectActiveMovie,
-  selectMovies,
-} from "../state/selectors";
 import { reviewsActions } from "../state/slice";
-
-const randomNames = [
-  "Ayla",
-  "Chrono",
-  "Nova",
-  "Riven",
-  "Kael",
-  "Mira",
-  "Orion",
-  "Vex",
-];
-const pickRandomName = () =>
-  randomNames[Math.floor(Math.random() * randomNames.length)];
-const newId = () => crypto.randomUUID()
 
 const ReviewsTemplate = () => {
   const dispatch = useAppDispatch();
-  const movies = useAppSelector(selectMovies);
-  const activeIndex = useAppSelector(selectActiveIndex);
-  const activeMovie = useAppSelector(selectActiveMovie);
+  const isLoading = useAppSelector((state) => state.reviews.isLoadingMovies);
+  const isSubmitting = useAppSelector(
+    (state) => state.reviews.isSubmittingReview
+  );
+  const loadError = useAppSelector((state) => state.reviews.loadError);
+  const movies = useAppSelector((state) => state.reviews.movies);
+  const activeIndex = useAppSelector((state) => state.reviews.activeIndex);
+  const activeMovie = movies[activeIndex];
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    dispatch(reviewsActions.fetchMoviesRequested());
+    dispatch(reviewsActions.fetchUsersRequested());
+  }, [dispatch]);
 
   const handleChangeActive = (_: any, idx: number) =>
     dispatch(reviewsActions.setActiveIndex(idx));
@@ -52,17 +43,13 @@ const ReviewsTemplate = () => {
     body: string;
     rating: number;
   }) => {
-    const reviewId = newId();
+    if (!activeMovie) return;
     dispatch(
-      reviewsActions.addReviewCommitted({
+      reviewsActions.addReviewRequested({
         movieId: activeMovie.id,
-        review: {
-          id: reviewId,
-          title: values.title,
-          body: values.body ?? "",
-          rating: values.rating,
-          userByUserReviewerId: { id: reviewId + "_u", name: pickRandomName() },
-        },
+        title: values.title,
+        body: values.body ?? "",
+        rating: values.rating,
       })
     );
     closeDialog();
@@ -70,7 +57,28 @@ const ReviewsTemplate = () => {
 
   return (
     <div css={pageStyles.appRoot}>
-      <Paper elevation={3} css={pageStyles.topBar}>
+      {isLoading && (
+        <Box css={pageStyles.skeletonBox} aria-live="polite">
+          <Typography variant="body2" color="text.secondary" align="center">
+            Loading movies…
+          </Typography>
+        </Box>
+      )}
+      {!isLoading && loadError && (
+        <Box css={pageStyles.errorBox} role="alert">
+          <Typography variant="body2" color="error" align="center">
+            {loadError}
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={() => dispatch(reviewsActions.fetchMoviesRequested())}
+            sx={{ mt: 1 }}
+          >
+            Retry
+          </Button>
+        </Box>
+      )}
+      <Paper elevation={3} css={pageStyles.topBar} role="navigation">
         <Typography css={pageStyles.brandText}>Cool Movies</Typography>
       </Paper>
 
@@ -90,7 +98,7 @@ const ReviewsTemplate = () => {
             scrollButtons="auto"
             css={pageStyles.tabsBar}
           >
-            {movies.map((movie) => (
+            {movies?.map((movie) => (
               <Tab
                 key={movie.id}
                 label={movie.title}
@@ -100,28 +108,34 @@ const ReviewsTemplate = () => {
           </Tabs>
         </Box>
 
-        <ReviewFeed
-          key={activeMovie.id}
-          movie={activeMovie}
-          containerId={`movie-feed-${activeMovie.id}`}
-        />
+        {!isLoading && !loadError && activeMovie && (
+          <ReviewFeed
+            key={activeMovie.id}
+            movie={activeMovie}
+            containerId={`movie-feed-${activeMovie.id}`}
+          />
+        )}
       </Container>
 
-      <Button
-        variant="contained"
-        color="secondary"
-        onClick={openDialog}
-        css={pageStyles.fabAddReview}
-      >
-        Add Review
-      </Button>
-
-      <AddReviewDialog
-        open={isDialogOpen}
-        movieTitle={activeMovie.title}
-        onClose={closeDialog}
-        onSubmit={handleSubmitNewReview}
-      />
+      {activeMovie && (
+        <>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={openDialog}
+            disabled={isSubmitting}
+            css={pageStyles.fabAddReview}
+          >
+            {isSubmitting ? "Saving…" : "Add Review"}
+          </Button>
+          <AddReviewDialog
+            open={isDialogOpen}
+            movieTitle={activeMovie.title}
+            onClose={closeDialog}
+            onSubmit={handleSubmitNewReview}
+          />
+        </>
+      )}
     </div>
   );
 };
@@ -132,6 +146,13 @@ const pageStyles = {
     display: "flex",
     flexDirection: "column",
     backgroundColor: appTheme.palette.background.default,
+  }),
+  skeletonBox: css({ padding: 24 }),
+  errorBox: css({
+    padding: 24,
+    display: "grid",
+    justifyItems: "center",
+    gap: 8,
   }),
   topBar: css({
     height: 56,
@@ -149,7 +170,7 @@ const pageStyles = {
   contentContainer: css({
     display: "grid",
     gap: 16,
-    paddingTop: 20,
+    paddingTop: 40,
     paddingBottom: 80,
   }),
   pageTitle: css({ textAlign: "center", letterSpacing: "-0.4px" }),
@@ -174,7 +195,7 @@ const pageStyles = {
     minHeight: 36,
     padding: "6px 14px",
     borderRadius: 10,
-    "&.Mui-selected": { color: appTheme.palette.primary.main },
+    "&.Mui-selected": { color: appTheme.palette.secondary.main },
   }),
   fabAddReview: css({
     position: "fixed",

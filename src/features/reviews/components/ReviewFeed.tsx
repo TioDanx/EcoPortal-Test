@@ -10,65 +10,88 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { appTheme } from "../../../theme";
-import { ReviewFeedProps } from "../../types/movie";
-
+import { ReviewFeedProps, GqlReview } from "../../types/movie";
 
 const CLAMP_LINES = 3;
 const LINE_HEIGHT_EM = 1.5;
 const CLAMP_THRESHOLD = 180;
 
+type SortOrder = "asc" | "desc";
+
 const ReviewFeed = ({ movie, containerId }: ReviewFeedProps) => {
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
-  const reviews = movie.movieReviewsByMovieId.nodes;
-
-  const averageRating = useMemo(
-    () =>
-      reviews.length
-        ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-        : 0,
-    [reviews]
-  );
-
-  const releaseYear = movie.releaseDate
-    ? new Date(movie.releaseDate).getFullYear()
-    : null;
+  const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
+  const [currentSortOrder, setCurrentSortOrder] = useState<SortOrder>("desc");
   const isDesktop = useMediaQuery(appTheme.breakpoints.up("md"));
 
-  const toggleItem = (id: string) =>
-    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  const reviews: GqlReview[] = (movie.movieReviewsByMovieId?.nodes ?? []).filter(
+    (review): review is GqlReview => Boolean(review)
+  );
+
+  const averageRating = useMemo(() => {
+    if (!reviews.length) return 0;
+    const total = reviews.reduce((sum, review) => sum + (review.rating ?? 0), 0);
+    return total / reviews.length;
+  }, [reviews]);
+
+  const sortedReviews = useMemo(() => {
+    const copy = [...reviews];
+    copy.sort((a, b) => {
+      const ratingA = a.rating ?? 0;
+      const ratingB = b.rating ?? 0;
+      return currentSortOrder === "asc" ? ratingA - ratingB : ratingB - ratingA;
+    });
+    return copy;
+  }, [reviews, currentSortOrder]);
+
+  const releaseYear = movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : null;
+
+  const toggleExpandedItem = (id: string) =>
+    setExpandedById((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const toggleSortOrder = () =>
+    setCurrentSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+
+  const sortIndicator = currentSortOrder === "asc" ? "↑" : "↓";
 
   return (
-    <section
-      id={containerId}
-      css={feedStyles.feedWrapper}
-      aria-labelledby="feed-heading"
-    >
+    <section id={containerId} css={feedStyles.feedWrapper} aria-labelledby="feed-heading">
       <header css={feedStyles.headerSection}>
         <img
-          src={movie.imgUrl}
-          alt={`${movie.title} poster`}
+          src={movie.imgUrl ?? ""}
+          alt={`${movie.title ?? "Movie"} poster`}
           css={feedStyles.headerPoster}
         />
 
         <div css={feedStyles.headerInfoColumn}>
-          <Typography
-            id="feed-heading"
-            variant="h5"
-            css={feedStyles.headerTitle}
-          >
-            {movie.title}
-          </Typography>
+          <div>
+            <Typography id="feed-heading" variant="h5" css={feedStyles.headerTitle}>
+              {movie.title ?? "Untitled"}
+            </Typography>
 
-          <Typography variant="body2" css={feedStyles.releaseText}>
-            {releaseYear ?? "-"}
-          </Typography>
+            <Typography variant="body2" css={feedStyles.releaseText}>
+              {releaseYear ?? "—"}
+            </Typography>
+          </div>
 
           <div css={feedStyles.metricRow}>
-            <Rating value={averageRating} precision={0.5} readOnly />
-            <Typography variant="body2" css={feedStyles.metricText}>
-              {averageRating.toFixed(1)} · {reviews.length}{" "}
-              {reviews.length === 1 ? "review" : "reviews"}
-            </Typography>
+            <div css={feedStyles.metricGroup}>
+              <Rating value={averageRating} precision={0.5} readOnly />
+              <Typography variant="body2" css={feedStyles.metricText}>
+                {averageRating.toFixed(1)} · {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+              </Typography>
+            </div>
+
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={toggleSortOrder}
+              css={feedStyles.orderByButton}
+              aria-pressed={currentSortOrder === "desc"}
+              aria-label={`order reviews by rating ${currentSortOrder === "asc" ? "ascending" : "descending"}`}
+              title={`Order by rating ${currentSortOrder === "asc" ? "ascending" : "descending"}`}
+            >
+              {`Rating ${sortIndicator}`}
+            </Button>
           </div>
         </div>
       </header>
@@ -76,22 +99,16 @@ const ReviewFeed = ({ movie, containerId }: ReviewFeedProps) => {
       <Divider css={feedStyles.headerDivider} />
 
       <div css={feedStyles.listContainer}>
-        {reviews.map((review, idx) => {
-          const shouldShowButton =
-            !isDesktop && review.body.length > CLAMP_THRESHOLD;
-          const shouldClampMobile = !isDesktop && !expandedIds[review.id];
+        {sortedReviews.map((review, index) => {
+          const reviewerName = review.userByUserReviewerId?.name ?? "Unknown";
+          const reviewBody = review.body ?? "";
+          const shouldShowToggle = !isDesktop && reviewBody.length > CLAMP_THRESHOLD;
+          const shouldClampMobile = !isDesktop && !expandedById[review.id as string];
 
           return (
-            <div key={review.id} css={feedStyles.reviewCard}>
-              <Stack
-                direction="row"
-                spacing={2}
-                alignItems="flex-start"
-                css={feedStyles.reviewRow}
-              >
-                <Avatar css={feedStyles.avatarBadge}>
-                  {review.userByUserReviewerId.name.charAt(0)}
-                </Avatar>
+            <div key={String(review.id)} css={feedStyles.reviewCard}>
+              <Stack direction="row" spacing={2} alignItems="flex-start" css={feedStyles.reviewRow}>
+                <Avatar css={feedStyles.avatarBadge}>{reviewerName.charAt(0)}</Avatar>
 
                 <div css={feedStyles.reviewContent}>
                   <Stack
@@ -100,42 +117,34 @@ const ReviewFeed = ({ movie, containerId }: ReviewFeedProps) => {
                     justifyContent="space-between"
                     css={feedStyles.reviewHeaderRow}
                   >
-                    <Typography
-                      variant="subtitle2"
-                      css={feedStyles.reviewerName}
-                    >
-                      {review.userByUserReviewerId.name} - {review.title}
+                    <Typography variant="subtitle2" css={feedStyles.reviewerName}>
+                      {reviewerName} — {review.title ?? "Review"}
                     </Typography>
-                    <Rating value={review.rating} readOnly size="small" />
+                    <Rating value={review.rating ?? 0} readOnly size="small" />
                   </Stack>
 
                   <Typography
                     variant="body2"
-                    css={[
-                      feedStyles.reviewBodyText,
-                      shouldClampMobile && feedStyles.clampedBodyMobile,
-                    ]}
+                    css={[feedStyles.reviewBodyText, shouldClampMobile && feedStyles.clampedBodyMobile]}
                   >
-                    {review.body}
+                    {reviewBody}
                   </Typography>
 
-                  {shouldShowButton && (
+                  {shouldShowToggle && (
                     <Button
                       variant="text"
                       size="small"
-                      onClick={() => toggleItem(review.id)}
+                      onClick={() => toggleExpandedItem(String(review.id))}
                       css={feedStyles.readMoreButtonMobile}
-                      aria-expanded={Boolean(expandedIds[review.id])}
+                      aria-expanded={Boolean(expandedById[String(review.id)])}
                     >
-                      {expandedIds[review.id] ? "Show less" : "Read more"}
+                      {expandedById[String(review.id)] ? "Show less" : "Read more"}
                     </Button>
                   )}
                 </div>
               </Stack>
 
-              {idx < reviews.length - 1 && (
-                <Divider css={feedStyles.itemDivider} />
-              )}
+              {index < sortedReviews.length - 1 && <Divider css={feedStyles.itemDivider} />}
             </div>
           );
         })}
@@ -158,6 +167,7 @@ const feedStyles = {
   headerSection: css({
     display: "grid",
     gridTemplateColumns: "1fr",
+    justifyContent: "space-evenly",
     gap: 12,
     [up("md")]: {
       gridTemplateColumns: "200px 1fr",
@@ -174,7 +184,10 @@ const feedStyles = {
     [up("md")]: { height: 260 },
   }),
   headerInfoColumn: css({
-    display: "grid",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-evenly",
+    height: "100%",
     gap: 6,
     [up("md")]: { gap: 8 },
   }),
@@ -191,9 +204,23 @@ const feedStyles = {
     alignItems: "center",
     gap: 10,
     marginTop: 2,
+    width: "100%",
+  }),
+  metricGroup: css({
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 0,
   }),
   metricText: css({
     color: appTheme.palette.text.secondary,
+    whiteSpace: "nowrap",
+  }),
+  orderByButton: css({
+    marginLeft: "auto",
+    borderRadius: 10,
+    paddingInline: 12,
+    height: 30,
   }),
   headerDivider: css({
     opacity: 0.12,
@@ -215,7 +242,7 @@ const feedStyles = {
     width: 32,
     height: 32,
     fontSize: "0.9rem",
-    backgroundColor: appTheme.palette.primary.main,
+    backgroundColor: appTheme.palette.secondary.main,
   }),
   reviewContent: css({
     display: "grid",
@@ -246,9 +273,7 @@ const feedStyles = {
     paddingLeft: 0,
     color: appTheme.palette.text.secondary,
     "&:hover": { color: appTheme.palette.text.primary },
-    [up("md")]: {
-      display: "none",
-    },
+    [up("md")]: { display: "none" },
   }),
   itemDivider: css({
     opacity: 0.14,

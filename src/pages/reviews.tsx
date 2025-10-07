@@ -1,4 +1,3 @@
-import React from 'react'
 import ReviewsTemplate from '../features/reviews/templates/ReviewsTemplate'
 
 const reviews = () => {

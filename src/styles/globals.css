@@ -1,3 +1,6 @@
+html{
+  scrollbar-gutter: stable both-edges;
+}
 html,
 body {
   padding: 0;
@@ -12,4 +15,8 @@ a {
 
 * {
   box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 1px;          
 }

@@ -12,7 +12,8 @@ import { exampleActions } from '../state';
 import { memo } from 'react';
 import { useCurrentUserLazyQuery } from '../../../generated/graphql';
 import { FetchButton } from '../components/FetchButton';
-
+import Link from 'next/link';
+import { appTheme } from '../../../theme';
 
 const Example = () => {
   const dispatch = useAppDispatch();
@@ -39,6 +40,7 @@ const Example = () => {
           {`I would recommend using Redux for a lot of your global state management. 
           For data fetching, you can use either Redux Observable or Apollo Hooks. Which you can see examples of below.`}
         </Typography>
+          <Link href="/reviews" css={styles.link}>Go to Reviews</Link>
 
         <Typography variant={'h4'} css={styles.subHeading}>
           {'State:'}
@@ -141,6 +143,28 @@ const styles = {
   dataInput: css({
     alignSelf: 'stretch',
     margin: '32px 0',
+  }),
+  link: css({
+    display: "inline-block",
+    backgroundColor: appTheme.palette.primary.main,
+    color: appTheme.palette.text.primary,
+    padding: "10px 18px",
+    fontSize: "0.9rem",
+    fontWeight: 500,
+    textDecoration: "none",
+    borderRadius: 8,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+    transition: "all 0.25s ease",
+    margin: "16px 0",
+    "&:hover": {
+      backgroundColor: appTheme.palette.secondary.dark,
+      transform: "opacity(90%)",
+      boxShadow: "0 6px 16px rgba(0,0,0,0.4)",
+      textDecoration: "none",
+    },
+    "&:active": {
+      transform: "scale(0.98)",
+    },
   }),
 };
 
