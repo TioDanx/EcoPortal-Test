@@ -1,44 +1,184 @@
-# Important Note
+# Coolmovies Web Challenge - Reviews Feature
 
-When submitting, please add the following user(s) as collaborators to your **private** repo:
 
-- GitHub `@SamuelCarlos`
-- Gitlab `@samuel.xavier`
+## What’s in this PR
 
-# Coolmovies web challenge
+Implements the **/reviews** endpoint for the existing **coolmovies-frontend** using the required stack: **Next.js**, **MUI**, **Redux Toolkit**, **Redux-Observable**, and **Apollo GraphQL**.
+Users can browse movies, view reviews, and **add a new review with a rating**.
 
-You have to add the cool movies review feature to the existing `coolmovies-frontend`. You are required to add a new `/reviews` endpoint to the application that renders a list of movies. A user should be able to add a new review with a rating.
+---
 
-We have created a basic app for you to get started in.
+## Demo flow
 
-What tooling has been setup for you: **You must use these tools to complete the test.**
+* **Route**: `/reviews`
+* **Tabs** to switch between movies
+* **Header** shows poster, release year, average rating, and review count
+* **Review feed** with per-review rating; on mobile, long bodies collapse with “Read more”
+* **Add Review** floating button → a modern dialog with validation
+* **Sorting**: “Rating ↑/↓” to order reviews ascending/descending
 
-- [Next.js](https://nextjs.org/) (Build Framework)
-- [MUI](https://mui.com/) (Component Library)
-- [Redux Toolkit](https://redux-toolkit.js.org/) (State Management)
-- [Redux-Observable](https://redux-observable.js.org/) (State Side-effect Middleware)
-- [Apollo GraphQL](https://www.apollographql.com/) (GraphQL Query Client)
+---
 
-If you're unfamiliar with any of these, please read their documentation. We have also added some example code for the ideal patterns we would like to see. Have a look at `src/pages/index.tsx`.
+## Architecture
 
-We are providing you a GraphQL API mock application to consume. We have also setup [GraphQL Codegen](https://the-guild.dev/graphql/codegen) for you. This will automatically generate graphql documents and hooks for you. To run this run `yarn graphql-types` with the backend running. To add more queries for this test just add more `*.graphql` files.
+```
+src/
+  features/
+    reviews/
+      components/
+        AddReviewDialog.tsx     # modal to submit a review
+        ReviewFeed.tsx          # responsive review list + sorter
+      state/
+        slice.ts                # Redux Toolkit slice
+        epics.ts                # Redux-Observable epics (movies, users, add review)
+      templates/
+        ReviewsTemplate.tsx     # page-level composition
+  pages/
+    reviews/index.tsx           # Next.js page exports ReviewsTemplate
+```
 
-## Acceptance Criteria
+### Data flow (Redux + Apollo)
 
-**You will be evaluated on your UI/UX. We expect this to be at the level of a basic prototype; clean and clear flow.**
+* **fetchMoviesEpic**: `AllMovies` query → stores **movies**
+* **fetchUsersEpic**: `AllUsers` query → stores **users**
+* **addReviewEpic**: `CreateMovieReview` mutation → on success, prepends review in state
+* **Random user** for the new review:
 
-**You will be evaluated on critical thinking and decision making, so be mindful of any direction you take**
+  1. pick a random user from `allUsers`;
+  2. fallback to first reviewer in the selected movie;
+  3. final fallback to a fixed UUID
 
-**You will be evaluated against your ability to understand and use the tooling provided and mimic existing patterns that are shown in the examples.**
+This preserves the test’s no-auth requirement while keeping reviews “owned” by a plausible user.
 
-There are 2 main components for this feature, they **MUST** be completed and working:
+---
 
-1. Listing of the movie reviews.
-2. Adding additional reviews.
+## UI/UX decisions (Acceptance Criteria)
 
-Additional things we would like to see:
+* **Prototype-level polish**: mobile-first, clean spacing, strong hierarchy
+* **Non-default MUI blue**: custom dark theme in `theme.ts` (brand primary/secondary, text, paper)
+* **A11y** (WCAG 2.1 focus on errors):
 
-1. Our designers don't like the default MUI blue. Change this.
-2. Make the proxied GraphQL URL an environment variable.
-3. Add a few unit tests to your code. (These must pass).
-4. Acessibility is important, [ARC Toolkit](https://chromewebstore.google.com/detail/arc-toolkit/chdkkkccnlfncngelccgbgfmjebmkmce?hl=en) extension is a good companion on this. Configure it to WCAG 2.1 and focus on **errors**.
+  * Proper roles (`aria-labelledby`, `aria-expanded`, `aria-pressed`)
+  * Keyboard reachable dialogs/buttons
+  * Sufficient color contrast in dark mode
+* **Sorting & collapsing** for better information density
+
+---
+
+## Environment & GraphQL proxy (CORS-safe)
+
+* Apollo client points to **`NEXT_PUBLIC_GRAPHQL_URL`** (defaults to `/graphql`).
+* Next.js rewrite proxies `/graphql` to the mock API; this avoids CORS issues.
+
+Create `.env.local`:
+
+```env
+# Apollo Client
+NEXT_PUBLIC_GRAPHQL_URL=/graphql
+
+# Next rewrite target (used by next.config.js)
+GRAPHQL_PROXY_TARGET=http://localhost:5001/graphql
+```
+
+`next.config.js`:
+
+```js
+/** @type {import('next').NextConfig} */
+module.exports = {
+  compiler: { emotion: true },
+  async rewrites() {
+    return [
+      {
+        source: '/graphql',
+        destination: process.env.GRAPHQL_PROXY_TARGET || 'http://localhost:5001/graphql',
+      },
+    ];
+  },
+  reactStrictMode: true,
+};
+```
+
+This satisfies “**Make the proxied GraphQL URL an environment variable**” while keeping local dev CORS-free.
+
+---
+
+## Codegen (GraphQL Code Generator)
+
+Make sure the mock API is running, then:
+
+```bash
+yarn graphql-types
+```
+
+This generates typed queries/mutations and React hooks under `src/generated/`.
+
+---
+
+## Getting started
+
+```bash
+# 1) Install deps
+yarn
+
+# 2) Start the mock GraphQL server (provided by the challenge)
+#    (Follow the backend’s README; default at http://localhost:5001/graphql)
+
+# 3) Generate GraphQL types
+yarn graphql-types
+
+# 4) Start the app
+yarn dev
+
+# App at http://localhost:3000
+# Reviews page at http://localhost:3000/reviews
+```
+
+---
+
+## Testing
+
+Basic unit tests (reducers, epics, and a lightweight component test):
+
+```bash
+yarn test
+```
+
+Jest is configured with `jest-environment-jsdom` and `ts-jest`.
+If you modify GraphQL types, re-run `yarn graphql-types` and tests.
+
+---
+
+## Theming & typography
+
+* Theme lives in `src/theme.ts`: dark palette, custom primary/secondary, rounded corners
+* Font: **Plus Jakarta Sans** via Next Font; applied at app root (`_app.tsx`) for consistent rendering
+
+---
+
+## Accessibility checklist (ARC Toolkit suggested)
+
+* Configure ARC Toolkit to **WCAG 2.1**
+* Check:
+
+  * Labels/roles on toggles (“Read more”), sort button (`aria-pressed`)
+  * Dialog focus trap and keyboard interaction
+  * Color contrast on dark backgrounds
+
+---
+
+## What to review
+
+* **/reviews** route behavior end-to-end
+* **Redux + Epics** patterns mirror the provided example (see `src/pages/index.tsx`)
+* **Environment-driven proxy** (no hardcoded URLs)
+* **Passing unit tests** and type-safety on GraphQL responses
+
+---
+
+## Notes
+
+* No authentication required for the challenge; random user assignment is deliberate and documented.
+* Components avoid inline styles; Emotion CSS uses **theme tokens** for consistency.
+* Mobile: collapsed review bodies; Desktop: full bodies, hidden collapse button.
+
+If you need anything else-scripts, extra tests, or more a11y affordances-I can extend this.
